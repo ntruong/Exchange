@@ -21,8 +21,11 @@ data Order = Order {
 , metadata :: OrderData
 }
 
--- | Standard representation of a list of asks and bids
+instance Show Order where
+  show (Order q p odata) = concat [show odata, " :: ", show q, " @ ", show p]
+
+-- | Standard representation of a list of bids and asks
 data Book = Book {
-  asks :: [Order]
-, bids :: [Order]
-}
+  bids :: [Order]
+, asks :: [Order]
+} deriving (Show)
