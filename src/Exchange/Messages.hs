@@ -1,13 +1,8 @@
 module Exchange.Messages
  ( Message(..)
- , OrderDirection(..)
- , OrderType(..)
  ) where
 
-import Exchange.Book (Order, OrderData)
+import Exchange.Order (Order, OrderMetadata)
 
-data OrderDirection = BID | ASK
-data OrderType = LIMIT | MARKET
-
-data Message = ORDER  { order :: Order, otype :: OrderType, direction :: OrderDirection }
-             | CANCEL { odata :: OrderData }
+data Message = ORDER  { order :: Order }
+             | CANCEL { ometa :: OrderMetadata }
