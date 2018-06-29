@@ -1,23 +1,23 @@
 module Main where
 
-import Exchange.Core
 import Exchange.Book
-import Exchange.Messages
+import Exchange.Core
 import Exchange.Order
+import Exchange.Messages
 import Exchange.Trader
 
 import Data.Map.Strict (fromList)
 
 bids' :: [Order]
-bids' = [ Order 100 97.0 (OrderData LIMIT PARTIAL BID) (OrderMetadata "order4" "trader4" "TICKER")
-        , Order 100 98.0 (OrderData LIMIT PARTIAL BID) (OrderMetadata "order5" "trader5" "TICKER")
-        , Order 100 99.0 (OrderData LIMIT PARTIAL BID) (OrderMetadata "order6" "trader6" "TICKER")
+bids' = [ Order 100 PARTIAL BID MARKET (OrderInfo "order4" "trader4" "TICKER")
+        , Order 100 PARTIAL BID MARKET (OrderInfo "order5" "trader5" "TICKER")
+        , Order 100 PARTIAL BID MARKET (OrderInfo "order6" "trader6" "TICKER")
         ]
 
 asks' :: [Order]
-asks' = [ Order 100 101.0 (OrderData LIMIT PARTIAL ASK) (OrderMetadata "order1" "trader1" "TICKER")
-        , Order 100 102.0 (OrderData LIMIT PARTIAL ASK) (OrderMetadata "order2" "trader2" "TICKER")
-        , Order 100 103.0 (OrderData LIMIT PARTIAL ASK) (OrderMetadata "order3" "trader3" "TICKER")
+asks' = [ Order 100 PARTIAL ASK MARKET (OrderInfo "order1" "trader1" "TICKER")
+        , Order 100 PARTIAL ASK MARKET (OrderInfo "order2" "trader2" "TICKER")
+        , Order 100 PARTIAL ASK MARKET (OrderInfo "order3" "trader3" "TICKER")
         ]
 
 books = fromList [("TICKER", Book bids' asks')]
@@ -33,4 +33,4 @@ exchange :: Exchange
 exchange = (books, traders)
 
 main :: IO ()
-main = putStrLn (show $ update (CANCEL (OrderMetadata "order2" "trader2" "TICKER")) exchange)
+main = putStrLn (show $ update (CANCEL (OrderInfo "order2" "trader2" "TICKER")) exchange)

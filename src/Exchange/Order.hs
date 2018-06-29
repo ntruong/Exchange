@@ -1,47 +1,48 @@
+--------------------------------------------------------------------------------
 module Exchange.Order
   ( Order(..)
-  , OrderData(..)
-  , OrderMetadata(..)
-  , OrderType(..)
   , OrderStyle(..)
   , OrderDirection(..)
+  , OrderContract(..)
+  , OrderInfo(..)
   ) where
+--------------------------------------------------------------------------------
 
-data OrderType = LIMIT | MARKET deriving (Show)
+-- | Specifies how the order should be fulfilled.
 data OrderStyle = PARTIAL
-                | AON
-                | FOK
                 deriving (Show)
-data OrderDirection = BID   | ASK    deriving (Show)
 
--- | Order information
-data OrderData = OrderData {
-  otype  :: OrderType
-, ostyle :: OrderStyle
-, odir   :: OrderDirection
-}
+-- | The direction of an order.
+data OrderDirection = BID | ASK deriving (Show)
 
--- | Should appear as "[type/style/direction]"
-instance Show OrderData where
-  show (OrderData t s d) = concat ["[", show t, "/", show s, "/", show d, "]"]
+-- | Order contract types; e.g. limit or market.
+data OrderContract = LIMIT { price :: Float }
+                   | MARKET
+                   deriving (Show)
 
--- | Order meta-information
-data OrderMetadata = OrderMetadata {
+-- | Order metadata, condensed into a single ADT. This represents the:
+-- oid    (order ID)
+-- tid    (trader ID)
+-- ticker (security ID)
+data OrderInfo = OrderInfo {
   oid    :: String
 , tid    :: String
 , ticker :: String
-}
+} deriving (Eq)
 
--- | Should appear as "[orderid/traderid]ticker"
-instance Show OrderMetadata where
-  show (OrderMetadata o t tick) = concat ["[", o, "/", t, "]", tick]
+-- | Should appear as "[orderid/traderid]ticker".
+instance Show OrderInfo where
+  show (OrderInfo o t tick) = concat ["[", o, "/", t, "]", tick]
 
+-- | Every order ships with:
+-- quantity   (amount of security to transact)
+-- info       (metadata about who/what placed the order)
+-- style      (how the order should be filled)
+-- contract   (the type of order and required info)
 data Order = Order {
   quantity :: Int
-, price    :: Float
-, odata    :: OrderData
-, ometa    :: OrderMetadata
-}
-
-instance Show Order where
-  show (Order q p d md) = concat [show md, " :: ", show q, " @ ", show p]
+, style    :: OrderStyle
+, dir      :: OrderDirection
+, contract :: OrderContract
+, info     :: OrderInfo
+} deriving (Show)

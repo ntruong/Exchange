@@ -1,44 +1,55 @@
+--------------------------------------------------------------------------------
 module Exchange.Core
   ( Exchange
   , Books
   , Traders
+  , Trader(..)
+  , Message(..)
   , update
   ) where
 
 import Exchange.Book
-import Exchange.Messages
 import Exchange.Order
+import Exchange.Messages
 import Exchange.Trader
+import Data.Map.Strict   (Map, adjust)
+--------------------------------------------------------------------------------
 
-import Data.Map.Strict (Map, adjust)
 
 {- TODO(ntruong):
  -   market orders
  -   limit orders
+ -   non-partial orders
  -   implement notifications/effectual
  -   better error checking for funds and whatnot
  #   order cancellation
  -}
 
-type Books = Map String Book
-type Traders = Map String Trader
+
+-- | Type aliases to make life easier.
 type Exchange = (Books, Traders)
+type Books    = Map String Book
+type Traders  = Map String Trader
 
--- | Big update; handles orders and cancellations and such
+
+-- | Update; handle orders and cancellations and such.
 update :: Message -> Exchange -> Exchange
-update msg (books, traders) = (adjust (f msg) tick books, traders)
+update msg (books, traders) = (books', traders')
   where
-    f    :: Message -> Book -> Book
-    tick :: String
-    (f, tick) = case msg of
-      CANCEL ometa -> (cancel, ticker ometa)
-      _        -> (const id, "")
+    handleBooks   :: (String, Book -> Book)
+    handleTraders :: [(String, Trader -> Trader)]
+    (handleBooks, handleTraders) = case msg of
+      CANCEL msginfo -> (cancel msginfo, [])
+      _            -> (("", id), [])
+    adj :: (Ord k) => (k, a -> a) -> Map k a -> Map k a
+    adj = uncurry $ flip adjust
+    books' = adj handleBooks books
+    traders' = foldr adj traders handleTraders
 
--- | Update a book according to a cancellation
-cancel :: Message -> Book -> Book
-cancel (CANCEL ometa) = \(Book bs as) -> Book (keep bs) (keep as)
+cancel :: OrderInfo -> (String, Book -> Book)
+cancel msginfo = (ticker msginfo, handleBook)
   where
+    handleBook :: Book -> Book
+    handleBook (Book bids asks) = Book (keep bids) (keep asks)
     keep :: [Order] -> [Order]
-    keep = filter (\(Order _ _ _ ometa') ->
-      ((oid ometa') /= (oid ometa)) || ((tid ometa') /= (tid ometa)))
-cancel _ = id
+    keep = filter (\order -> (info order) /= msginfo)
