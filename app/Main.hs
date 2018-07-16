@@ -20,7 +20,7 @@ asks' = [ Order 100 PARTIAL ASK MARKET (OrderInfo "order1" "trader1" "TICKER")
         , Order 100 PARTIAL ASK MARKET (OrderInfo "order3" "trader3" "TICKER")
         ]
 
-books = fromList [("TICKER", Book bids' asks')]
+books = fromList [("TICKER", Book bids' asks' Nothing)]
 traders = fromList [ ("trader1", Trader 100.0)
                    , ("trader2", Trader 100.0)
                    , ("trader3", Trader 100.0)

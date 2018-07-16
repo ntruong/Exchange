@@ -16,9 +16,9 @@ data OrderStyle = PARTIAL
 data OrderDirection = BID | ASK deriving (Show)
 
 -- | Order contract types; e.g. limit or market.
-data OrderContract = LIMIT { price :: Float }
-                   | MARKET
-                   deriving (Show)
+data OrderContract = MARKET
+                   | LIMIT { price :: Float }
+                   deriving (Eq, Ord, Show)
 
 -- | Order metadata, condensed into a single ADT. This represents the:
 -- oid    (order ID)
