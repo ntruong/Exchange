@@ -14,6 +14,7 @@ import Exchange.Messages
 import Exchange.Trader
 import Data.List           (inits, partition, sortOn)
 import Data.Map.Strict     (Map, adjust, insert, (!))
+import Data.Maybe          (fromMaybe)
 --------------------------------------------------------------------------------
 
 
@@ -71,12 +72,10 @@ update (ORDER msgorder) (books, traders) = (books', traders')
         generateTrades (Order amt _ _ con inf) = [trade, trade']
           where
             p = case con of
-              MARKET -> case lastP of
-                Just p' -> p'
-                Nothing -> 0 -- If there are no prior trades, set it at 0
+              MARKET -> fromMaybe 0 lastP
             cash = case dir msgorder of
-              BID -> -p * (fromIntegral amt)
-              ASK -> p * (fromIntegral amt)
+              BID -> -p * fromIntegral amt
+              ASK -> p * fromIntegral amt
             trade  = ((tid . info) msgorder, \t -> t { funds = funds t + cash })
             trade' = (tid inf, \t -> t { funds = funds t - cash })
 
@@ -125,7 +124,7 @@ handleOrder order orders = (order', filled, unfilled)
 
     -- Parse out orders from the cumulative list
     (lFillable, lUnfillable) =
-      partition (\x -> (any id) $ ($ x) <$> conditions) cumulative
+      partition (\x -> and $ ($ x) <$> conditions) cumulative
     fillable   = fst <$> lFillable
     unfillable = fst <$> lUnfillable
 
@@ -139,7 +138,7 @@ handleOrder order orders = (order', filled, unfilled)
         remaining -> case unfillable of
           -- We have no opposing orders; leave the order on the book
           [] ->
-            ( (Just $ order { quantity = remaining })
+            ( Just $ order { quantity = remaining }
             , fillable
             , unfillable
             )

@@ -39,7 +39,7 @@ executables:
 
 tests:
   hs-exchange-test:
-    main:                Spec.hs
+    main:                Exchange/Spec.hs
     source-dirs:         test
     ghc-options:
     - -threaded
