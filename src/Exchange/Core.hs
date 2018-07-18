@@ -60,9 +60,11 @@ update (ORDER msgorder) (books, traders) = (books', traders')
         Just x -> Book unfilled (x:asks) lastP'
         Nothing -> Book unfilled asks lastP'
       where
-        lastP' = case (contract . last) filled of
-          MARKET  -> lastP
-          LIMIT p -> Just p
+        lastP' = case reverse filled of
+          []  -> lastP
+          x:_ -> case contract x of
+            MARKET  -> lastP
+            LIMIT p -> Just p
 
     -- Generate the trades
     handleTraders :: [(String, Trader -> Trader)]
@@ -129,9 +131,13 @@ handleOrder order orders = (order', filled, unfilled)
     unfillable = fst <$> lUnfillable
 
     -- Do math
-    (order', filled, unfilled) =
-      -- See if we have any remainder quantity to be filled
-      case quantity order - (snd . last) lFillable of
+    (order', filled, unfilled) = case reverse lFillable of
+      []  ->
+        ( Just $ order { quantity = quantity order }
+        , fillable
+        , unfillable
+        )
+      (_, q):_ -> case quantity order - q of
         -- Lucky! It was a perfect fill
         0 -> (Nothing, fillable, unfillable)
         -- We have to handle partial filling of opposing orders

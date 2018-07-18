@@ -10,5 +10,5 @@ runner specName specs = result
     formatSpec :: (String, Bool) -> IO ()
     formatSpec (specID, spec)
       | spec      = return ()
-      | otherwise = print $ "[!] Failed " ++ specName ++ "/" ++ specID
-    result = sequence_ (formatSpec <$> specs)
+      | otherwise = putStrLn $ "[!] Failed " ++ specName ++ "/" ++ specID
+    result = sequence_ $ putStrLn "" : (formatSpec <$> specs)
