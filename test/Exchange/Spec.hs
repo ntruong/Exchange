@@ -52,9 +52,9 @@ cancelSpec = result
     order = OrderInfo "order1" "trader1" "TICKER"
     msg :: Message
     msg = CANCEL order
-    books :: Map String Book
-    (books, _) = update msg exchange
-    orderbook = books ! "TICKER"
+    testbooks :: Map String Book
+    (testbooks, _) = update msg exchange
+    orderbook = testbooks ! "TICKER"
     Book bids asks _ = orderbook
     conditions =
       [ length bids == 2
@@ -73,9 +73,9 @@ fillOrderSpec = result
     order = Order 100 PARTIAL BID MARKET info
     msg :: Message
     msg = ORDER order
-    books :: Map String Book
-    (books, _) = update msg exchange
-    orderbook = books ! "TICKER"
+    testbooks :: Map String Book
+    (testbooks, _) = update msg exchange
+    orderbook = testbooks ! "TICKER"
     Book bids asks _ = orderbook
     conditions =
       [ length bids == 3
@@ -92,8 +92,8 @@ unfillLimitOrderSpec = result
     makeLimit order = order { contract = LIMIT 100 }
     transform :: Book -> Book
     transform book = book
-      { bids = makeLimit <$> bids
-      , asks = makeLimit <$> asks
+      { bids = makeLimit <$> bids book
+      , asks = makeLimit <$> asks book
       }
     books' :: Map String Book
     books' = Data.Map.Strict.map transform books
@@ -105,13 +105,13 @@ unfillLimitOrderSpec = result
     order = Order 100 PARTIAL BID (LIMIT 90) info
     msg :: Message
     msg = ORDER order
-    books :: Map String Book
-    (books, _) = update msg exchange'
-    orderbook = books ! "TICKER"
-    Book bids asks _ = orderbook
+    testbooks :: Map String Book
+    (testbooks, _) = update msg exchange'
+    orderbook = testbooks ! "TICKER"
+    Book bids' asks' _ = orderbook
     conditions =
-      [ length bids == 4
-      , length asks == 3
+      [ length bids' == 4
+      , length asks' == 3
       , orderIsIn info orderbook
       ]
     result = and conditions
