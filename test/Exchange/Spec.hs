@@ -116,6 +116,40 @@ unfillLimitOrderSpec = result
       ]
     result = and conditions
 
+-- | Create an filled (LIMIT) order
+fillLimitOrderSpec :: Bool
+fillLimitOrderSpec = result
+  where
+    makeLimit :: Order -> Order
+    makeLimit order = order { contract = LIMIT 100 }
+    transform :: Book -> Book
+    transform book = book
+      { bids = makeLimit <$> bids book
+      , asks = makeLimit <$> asks book
+      }
+    books' :: Map String Book
+    books' = Data.Map.Strict.map transform books
+    exchange' :: Exchange
+    exchange' = (books', traders)
+    info :: OrderInfo
+    info = OrderInfo "order7" "trader1" "TICKER"
+    order :: Order
+    order = Order 100 PARTIAL BID (LIMIT 100) info
+    msg :: Message
+    msg = ORDER order
+    testbooks :: Map String Book
+    (testbooks, testtraders) = update msg exchange'
+    orderbook = testbooks ! "TICKER"
+    trader = testtraders ! "trader1"
+    Book bids' asks' _ = orderbook
+    conditions =
+      [ length bids' == 3
+      , length asks' == 2
+      , not $ orderIsIn info orderbook
+      , funds trader == -9900
+      ]
+    result = and conditions
+
 main :: IO ()
 main = runner "Exchange" specs
   where
@@ -123,4 +157,5 @@ main = runner "Exchange" specs
       [ ("cancelSpec",           cancelSpec)
       , ("fillOrderSpec",        fillOrderSpec)
       , ("unfillLimitOrderSpec", unfillLimitOrderSpec)
+      , ("fillLimitOrderSpec",   fillLimitOrderSpec)
       ]

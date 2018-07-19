@@ -63,7 +63,9 @@ update (ORDER msgorder) (books, traders) = (books', traders')
         lastP' = case reverse filled of
           []  -> lastP
           x:_ -> case contract x of
-            MARKET  -> lastP
+            MARKET  -> case contract msgorder of
+              MARKET  -> lastP
+              LIMIT p -> Just p
             LIMIT p -> Just p
 
     -- Generate the trades
@@ -74,7 +76,10 @@ update (ORDER msgorder) (books, traders) = (books', traders')
         generateTrades (Order amt _ _ con inf) = [trade, trade']
           where
             p = case con of
-              MARKET -> fromMaybe 0 lastP
+              MARKET  -> case contract msgorder of
+                MARKET  -> fromMaybe 0 lastP
+                LIMIT p -> p
+              LIMIT p -> p
             cash = case dir msgorder of
               BID -> -p * fromIntegral amt
               ASK -> p * fromIntegral amt
