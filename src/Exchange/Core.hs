@@ -4,17 +4,17 @@ module Exchange.Core
   , Books
   , Traders
   , Trader(..)
-  , Message(..)
   , update
   ) where
 
-import Exchange.Book
-import Exchange.Order
-import Exchange.Messages
-import Exchange.Trader
-import Data.List           (inits, partition, sortOn)
-import Data.Map.Strict     (Map, adjust, insert, (!))
-import Data.Maybe          (fromMaybe)
+import           Exchange.Book
+import           Exchange.Order
+import qualified Exchange.Messages                              as Msg
+import           Exchange.Trader
+import           Data.List           (inits, partition, sort)
+import           Data.Map.Strict     (Map, adjust, insert, (!?))
+import           Data.Maybe          (fromMaybe)
+import           Data.Ord            (Down)
 --------------------------------------------------------------------------------
 
 
@@ -35,80 +35,76 @@ type Traders  = Map String Trader
 
 
 -- | Update; handle orders and cancellations and such.
-update :: Message -> Exchange -> Exchange
+update :: Msg.Message -> Exchange -> Exchange
 
-update (ORDER msgorder) (books, traders) = (books', traders')
+update (Msg.Limit msgorder msgdir) (books, traders) = result
   where
-    msgticker = (ticker . info) msgorder
-    Book bids asks lastP = books ! msgticker
+    msgticker = (ticker . metadata) msgorder
+    msgtrader = (tid . metadata) msgorder
+    result = case books !? msgticker of
+      -- If the ticker isn't in the map, do nothing.
+      -- TODO: should return an error at some point, when responses are implemented.
+      Nothing -> (books, traders)
+      Just (Book bids asks lastP) -> (books', traders')
+        where
+          -- Get the result of applying the order to the book.
+          (potential, filled, unfilled) = handleOrder msgdir msgorder opps
+            where
+              opps = case msgdir of
+                Bid -> asks
+                Ask -> bids
 
-    -- Get the modified orders
-    remaining :: Maybe Order
-    filled :: [Order]
-    unfilled :: [Order]
-    (remaining, filled, unfilled) = case dir msgorder of
-      BID -> handleOrder msgorder asks
-      ASK -> handleOrder msgorder bids
+          -- Update the last traded price.
+          lastP' = case reverse filled of
+            []  -> lastP
+            x:_ -> Just $ price x
 
-    -- Get the modified book
-    newBook :: Book
-    newBook = case dir msgorder of
-      BID -> case remaining of
-        Just x -> Book (x:bids) unfilled lastP'
-        Nothing -> Book bids unfilled lastP'
-      ASK -> case remaining of
-        Just x -> Book unfilled (x:asks) lastP'
-        Nothing -> Book unfilled asks lastP'
-      where
-        lastP' = case reverse filled of
-          []  -> lastP
-          x:_ -> case contract x of
-            MARKET  -> case contract msgorder of
-              MARKET  -> lastP
-              LIMIT p -> Just p
-            LIMIT p -> Just p
+          -- Generate the new book after the trade is completed.
+          newBook = case msgdir of
+            Bid -> case potential of
+              Just x  -> Book (x:bids) unfilled lastP'
+              Nothing -> Book bids unfilled lastP'
+            Ask -> case potential of
+              Just x  -> Book unfilled (x:asks) lastP'
+              Nothing -> Book unfilled asks lastP'
 
-    -- Generate the trades
-    handleTraders :: [(String, Trader -> Trader)]
-    handleTraders = concat $ generateTrades <$> filled
-      where
-        generateTrades :: Order -> [(String, Trader -> Trader)]
-        generateTrades (Order amt _ _ con inf) = [trade, trade']
-          where
-            p = case con of
-              MARKET  -> case contract msgorder of
-                MARKET  -> fromMaybe 0 lastP
-                LIMIT p -> p
-              LIMIT p -> p
-            cash = case dir msgorder of
-              BID -> -p * fromIntegral amt
-              ASK -> p * fromIntegral amt
-            trade  = ((tid . info) msgorder, \t -> t { funds = funds t + cash })
-            trade' = (tid inf, \t -> t { funds = funds t - cash })
+          -- Generate the necessary updates for the filled orders' traders.
+          traderUpdates = concat $ createUpdate <$> filled
+            where
+              createUpdate (Order tq tp tmd) = ts
+                where
+                  cash = case msgdir of
+                    Bid -> -1 * tp * fromIntegral tq
+                    Ask ->  1 * tp * fromIntegral tq
+                  ts =
+                    [ (msgtrader, \t -> t { funds = funds t + cash })
+                    , (tid tmd, \t -> t { funds = funds t - cash })
+                    ]
 
-    -- Update the maps
-    books' = adjust (const newBook) msgticker books
-    traders' = foldr (\(k, v) m -> adjust v k m) traders handleTraders
+          -- Update the values in the map.
+          books' = adjust (const newBook) msgticker books
+          traders' = foldr (\(k, v) ts' -> adjust v k ts') traders traderUpdates
 
--- | Filter out orders that match the given metadata
-update (CANCEL msginfo) (books, traders) = (books', traders)
+-- | Remove the requested order from the orderbook.
+update (Msg.Cancel msgmd) (books, traders) = (books', traders)
   where
     keep :: [Order] -> [Order]
-    keep = filter ((msginfo /=) . info)
-    handleBook :: Book -> Book
-    handleBook (Book bids asks lastP) = Book (keep bids) (keep asks) lastP
-    books' = adjust handleBook (ticker msginfo) books
+    keep = filter ((msgmd /=) . metadata)
+    removeOrder :: Book -> Book
+    removeOrder (Book bids asks lastP) = Book (keep bids) (keep asks) lastP
+    books' = adjust removeOrder (ticker msgmd) books
 
--- | Handle logic of an order reducing a given book
-handleOrder :: Order -> [Order] -> (Maybe Order, [Order], [Order])
-handleOrder order orders = (order', filled, unfilled)
+-- | Reduce a book with a given order, returning a potentially unfilled order to
+-- be left on the book, filled orders, and unfilled orders.
+handleOrder :: Direction -> Order -> [Order] -> (Maybe Order, [Order], [Order])
+handleOrder direction order orders = (potential, filled, unfilled)
   where
-    -- Get an accumulating list of filled orders/quantities/prices
-    sorted = (theOrder . sortOn contract) orders
-      where
-        theOrder = case dir order of
-          BID -> id
-          ASK -> reverse
+    -- Sort the opposing orders based on fill precedence.
+    sorted = case direction of
+      Bid -> sort orders
+      -- Ask -> sortOn Down orders
+
+    -- Zip the orders together with the cumulative amount filled.
     cumulative :: [(Order, Int)]
     cumulative = zip sorted (tail . scanl (+) 0 $ quantity <$> sorted)
 
@@ -116,46 +112,36 @@ handleOrder order orders = (order', filled, unfilled)
     goodQuant :: (Order, Int) -> Bool
     goodQuant = (<= quantity order) . snd
     goodPrice :: (Order, Int) -> Bool
-    goodPrice (oppOrd, _) = case contract order of
-      -- Automatically keep all opposing order prices if this is a market
-      MARKET  -> True
-      LIMIT p -> case contract oppOrd of
-        -- Automatically keep opposing market orders
-        MARKET  -> True
-        -- Only keep opposing limit orders cheaper than this one
-        LIMIT p' -> p >= p'
+    goodPrice = f . price . fst
+      where
+        f = case direction of
+          Bid -> (<= price order)
+          Ask -> (>= price order)
+
+    -- All the conditions an order must fulfill to be fillable.
     conditions =
       [ goodQuant
       , goodPrice
       ]
 
-    -- Parse out orders from the cumulative list
-    (lFillable, lUnfillable) =
-      partition (\x -> and $ ($ x) <$> conditions) cumulative
-    fillable   = fst <$> lFillable
-    unfillable = fst <$> lUnfillable
+    -- Parse out fillable/unfillable orders from the cumulative list.
+    (fillable, unfillable) =
+      let (x, y) = partition (\x -> and (($ x) <$> conditions)) cumulative
+      in  (fst <$> x, fst <$> y)
 
-    -- Do math
-    (order', filled, unfilled) = case reverse lFillable of
-      []  ->
-        ( Just $ order { quantity = quantity order }
-        , fillable
-        , unfillable
-        )
-      (_, q):_ -> case quantity order - q of
-        -- Lucky! It was a perfect fill
-        0 -> (Nothing, fillable, unfillable)
-        -- We have to handle partial filling of opposing orders
-        remaining -> case unfillable of
-          -- We have no opposing orders; leave the order on the book
-          [] ->
-            ( Just $ order { quantity = remaining }
-            , fillable
-            , unfillable
-            )
-          -- We have opposing orders; modify the first available
-          (y:ys) ->
-            ( Nothing
-            , fillable ++ [y { quantity = remaining }]
-            , y { quantity = quantity y - remaining } : ys
-            )
+    -- Calculate results.
+    filledQuantity = case (take $ length fillable) cumulative of
+      [] -> 0
+      xs -> (snd . last) xs
+    potential = case quantity order - filledQuantity of
+      0 -> Nothing
+      x -> Just order { quantity = x }
+    (filled, unfilled) = case quantity order - filledQuantity of
+      -- Lucky! It was a perfect fill.
+      0 -> (fillable, unfillable)
+      x -> case unfillable of
+        []     -> (fillable, unfillable)
+        (y:ys) ->
+          ( y { quantity = x } : fillable
+          , y { quantity = quantity y - x } : ys
+          )

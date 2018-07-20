@@ -5,6 +5,6 @@ module Exchange.Trader
 --------------------------------------------------------------------------------
 
 -- | Trader information.
-data Trader = Trader {
-  funds :: Float
-} deriving (Show)
+data Trader = Trader
+  { funds :: Float
+  } deriving (Show)

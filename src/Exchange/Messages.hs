@@ -3,9 +3,17 @@ module Exchange.Messages
   ( Message(..)
   ) where
 
-import Exchange.Order (Order, OrderInfo)
+import Exchange.Order (Direction, Metadata, Order)
 --------------------------------------------------------------------------------
 
 -- | Messages the exchange is expected to receive and handle.
-data Message = ORDER  { order :: Order }
-             | CANCEL { msginfo :: OrderInfo }
+data Message = Limit { order :: Order
+                     , dir   :: Direction
+                     }
+
+             | Market { quantity :: Int
+                      , dir      :: Direction
+                      , metadata :: Metadata
+                      }
+
+             | Cancel { metadata :: Metadata }
