@@ -1,28 +1,28 @@
 --------------------------------------------------------------------------------
 import SpecRunner
 
-import Exchange.Book
-import Exchange.Core
-import Exchange.Order
-import Exchange.Messages
-import Exchange.Trader
+import           Exchange.Book
+import           Exchange.Core
+import           Exchange.Order
+import qualified Exchange.Messages as Msg
+import           Exchange.Trader
 
 import Data.List       (find)
 import Data.Map.Strict (Map, fromList, map, (!))
-import Data.Maybe      (fromMaybe)
+import Data.Maybe      (fromMaybe, isNothing)
 --------------------------------------------------------------------------------
 
 -- | Test setup
 bids' :: [Order]
-bids' = [ Order 100 PARTIAL BID MARKET (OrderInfo "order1" "trader1" "TICKER")
-        , Order 100 PARTIAL BID MARKET (OrderInfo "order2" "trader2" "TICKER")
-        , Order 100 PARTIAL BID MARKET (OrderInfo "order3" "trader3" "TICKER")
+bids' = [ Order 100 85 (Metadata "order1" "trader1" "TICKER")
+        , Order 100 90 (Metadata "order2" "trader2" "TICKER")
+        , Order 100 95 (Metadata "order3" "trader3" "TICKER")
         ]
 
 asks' :: [Order]
-asks' = [ Order 100 PARTIAL ASK MARKET (OrderInfo "order4" "trader4" "TICKER")
-        , Order 100 PARTIAL ASK MARKET (OrderInfo "order5" "trader5" "TICKER")
-        , Order 100 PARTIAL ASK MARKET (OrderInfo "order6" "trader6" "TICKER")
+asks' = [ Order 100 105 (Metadata "order4" "trader4" "TICKER")
+        , Order 100 110 (Metadata "order5" "trader5" "TICKER")
+        , Order 100 115 (Metadata "order6" "trader6" "TICKER")
         ]
 
 books = fromList [("TICKER", Book bids' asks' Nothing)]
@@ -34,13 +34,16 @@ traders = fromList [ ("trader1", Trader 100.0)
                    , ("trader6", Trader 100.0)
                    ]
 
+testmd :: Metadata
+testmd = Metadata "order7" "trader1" "TICKER"
+
 exchange :: Exchange
 exchange = (books, traders)
 
-orderIsIn :: OrderInfo -> Book -> Bool
-orderIsIn order (Book bids asks _) = result
+orderIsIn :: Metadata -> Book -> Bool
+orderIsIn md (Book bids asks _) = result
   where
-    result = case find ((order ==) . info) (bids ++ asks) of
+    result = case find ((md ==) . metadata) (bids ++ asks) of
       Just _  -> True
       Nothing -> False
 
@@ -48,10 +51,10 @@ orderIsIn order (Book bids asks _) = result
 cancelSpec :: Bool
 cancelSpec = result
   where
-    order :: OrderInfo
-    order = OrderInfo "order1" "trader1" "TICKER"
-    msg :: Message
-    msg = CANCEL order
+    testmd' :: Metadata
+    testmd' = Metadata "order1" "trader1" "TICKER"
+    msg :: Msg.Message
+    msg = Msg.Cancel testmd'
     testbooks :: Map String Book
     (testbooks, _) = update msg exchange
     orderbook = testbooks ! "TICKER"
@@ -59,7 +62,7 @@ cancelSpec = result
     conditions =
       [ length bids == 2
       , length asks == 3
-      , not $ orderIsIn order orderbook
+      , not $ orderIsIn testmd' orderbook
       ]
     result = and conditions
 
@@ -67,86 +70,58 @@ cancelSpec = result
 fillOrderSpec :: Bool
 fillOrderSpec = result
   where
-    info :: OrderInfo
-    info = OrderInfo "order7" "trader1" "TICKER"
-    order :: Order
-    order = Order 100 PARTIAL BID MARKET info
-    msg :: Message
-    msg = ORDER order
+    msg :: Msg.Message
+    msg = Msg.Market 100 Bid testmd
     testbooks :: Map String Book
     (testbooks, _) = update msg exchange
     orderbook = testbooks ! "TICKER"
-    Book bids asks _ = orderbook
+    Book bids asks lp = orderbook
     conditions =
       [ length bids == 3
       , length asks == 2
-      , not $ orderIsIn info orderbook
+      , lp == Just 105
+      , not $ orderIsIn testmd orderbook
       ]
     result = and conditions
 
--- | Create an unfilled (LIMIT) order
+-- | Create an unfilled order
 unfillLimitOrderSpec :: Bool
 unfillLimitOrderSpec = result
   where
-    makeLimit :: Order -> Order
-    makeLimit order = order { contract = LIMIT 100 }
-    transform :: Book -> Book
-    transform book = book
-      { bids = makeLimit <$> bids book
-      , asks = makeLimit <$> asks book
-      }
-    books' :: Map String Book
-    books' = Data.Map.Strict.map transform books
-    exchange' :: Exchange
-    exchange' = (books', traders)
-    info :: OrderInfo
-    info = OrderInfo "order7" "trader1" "TICKER"
     order :: Order
-    order = Order 100 PARTIAL BID (LIMIT 90) info
-    msg :: Message
-    msg = ORDER order
+    order = Order 100 99 testmd
+    msg :: Msg.Message
+    msg = Msg.Limit order Bid
     testbooks :: Map String Book
-    (testbooks, _) = update msg exchange'
+    (testbooks, _) = update msg exchange
     orderbook = testbooks ! "TICKER"
-    Book bids' asks' _ = orderbook
+    Book testbids testasks lp = orderbook
     conditions =
-      [ length bids' == 4
-      , length asks' == 3
-      , orderIsIn info orderbook
+      [ length testbids == 4
+      , length testasks == 3
+      , isNothing lp
+      , orderIsIn testmd orderbook
       ]
     result = and conditions
 
--- | Create an filled (LIMIT) order
+-- | Create a filled  order
 fillLimitOrderSpec :: Bool
 fillLimitOrderSpec = result
   where
-    makeLimit :: Order -> Order
-    makeLimit order = order { contract = LIMIT 100 }
-    transform :: Book -> Book
-    transform book = book
-      { bids = makeLimit <$> bids book
-      , asks = makeLimit <$> asks book
-      }
-    books' :: Map String Book
-    books' = Data.Map.Strict.map transform books
-    exchange' :: Exchange
-    exchange' = (books', traders)
-    info :: OrderInfo
-    info = OrderInfo "order7" "trader1" "TICKER"
     order :: Order
-    order = Order 100 PARTIAL BID (LIMIT 100) info
-    msg :: Message
-    msg = ORDER order
+    order = Order 100 120 testmd
+    msg :: Msg.Message
+    msg = Msg.Limit order Bid
     testbooks :: Map String Book
-    (testbooks, testtraders) = update msg exchange'
+    (testbooks, testtraders) = update msg exchange
     orderbook = testbooks ! "TICKER"
     trader = testtraders ! "trader1"
     Book bids' asks' _ = orderbook
     conditions =
       [ length bids' == 3
       , length asks' == 2
-      , not $ orderIsIn info orderbook
-      , funds trader == -9900
+      , not $ orderIsIn testmd orderbook
+      , funds trader == -10400
       ]
     result = and conditions
 
