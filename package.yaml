@@ -20,8 +20,9 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/n-truong/hs-exchange#readme>
 
 dependencies:
-- base       >= 4.7 && < 5
-- containers >= 0.6
+- base           >= 4.7 && < 5
+- containers     >= 0.6
+- numeric-limits >= 0.1
 
 library:
   source-dirs: src

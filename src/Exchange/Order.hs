@@ -33,7 +33,16 @@ data Order = Order
   { quantity :: Int
   , price    :: Float
   , metadata :: Metadata
-  } deriving (Show)
+  }
+
+instance Show Order where
+  show (Order q p m) = concat
+    [ show m
+    , ": "
+    , show q
+    , " @ "
+    , show p
+    ]
 
 instance Eq Order where
   x == y = price x == price y
