@@ -21,8 +21,9 @@ description:         Please see the README on GitHub at <https://github.com/n-tr
 
 dependencies:
 - base           >= 4.7 && < 5
-- containers     >= 0.6
+- containers     >= 0.5
 - numeric-limits >= 0.1
+- warp           >= 3.2
 
 library:
   source-dirs: src

@@ -1,11 +1,11 @@
 --------------------------------------------------------------------------------
-module Exchange.Core where
---   ( Exchange
---   , Books
---   , Traders
---   , Trader(..)
---   , update
---   ) where
+module Exchange.Core
+  ( Exchange
+  , Books
+  , Traders
+  , Trader(..)
+  , update
+  ) where
 
 import           Exchange.Book
 import           Exchange.Order
@@ -18,16 +18,6 @@ import           Numeric.Limits
 --------------------------------------------------------------------------------
 
 
-{- TODO(ntruong):
- -   market orders
- -   limit orders
- -   non-partial orders
- -   implement notifications/effectual
- -   better error checking for funds and whatnot
- #   order cancellation
- -}
-
-
 -- | Type aliases to make life easier.
 type Exchange = (Books, Traders)
 type Books    = M.Map String Book
@@ -35,7 +25,7 @@ type Traders  = M.Map String Trader
 
 
 -- | Update; handle orders and cancellations and such.
-update :: Msg.Message -> Exchange -> Exchange
+update :: Msg.Request -> Exchange -> Exchange
 
 update (Msg.Limit msgorder msgdir) (books, traders) = result
   where
@@ -130,6 +120,9 @@ update (Msg.Market msgquant msgdir msgmd) (books, traders) = result
           -- Update the values in the map.
           books' = M.adjust (const newBook) msgticker books
           traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
+
+-- | Get the current status of the exchange; a no-op.
+update Msg.Status exchange = exchange
 
 -- | Remove the requested order from the orderbook.
 update (Msg.Cancel msgmd) (books, traders) = (books', traders)
