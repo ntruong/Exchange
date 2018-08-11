@@ -2,3 +2,4 @@
 hs-exchange.cabal
 *~
 *.vim
+*.DS_Store
