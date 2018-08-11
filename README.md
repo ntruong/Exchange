@@ -1,20 +1,13 @@
 # Exchange
 
-First build with
+Use
 ```
 stack build
-```
-then use
-```
 stack exec Exchange
 ```
 to run the application.
 
-Tests can be run with
-```
-stack test
-```
-as usual.
+Tests can be run with `stack test` as usual.
 
 ## Orderbook logic
 As of now, orders are evaluated with partial filling; "all-or-none" or
