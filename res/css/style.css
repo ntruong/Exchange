@@ -1,0 +1,199 @@
+@font-face {
+  font-family: 'open_sanslight';
+  src: url("../res/fonts/open-sans.woff") format('woff');
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-family: open_sanslight;
+  background: #f9f9f9;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+h1, a {
+  color: #444444;
+  opacity: 0.5;
+  font-weight: 300;
+}
+
+h1 {
+  text-align: center;
+  font-weight: normal;
+}
+
+a {
+  color: #444444;
+  opacity: 0.5;
+  text-decoration: none;
+}
+
+a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #cccccc;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.panel:hover {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  float: left;
+  width: 536px;
+  height: 300px;
+  overflow: hidden;
+}
+
+.main > * {
+  opacity: 0;
+}
+
+.main:hover > * {
+  opacity: 1;
+}
+
+.depressed {
+  background: #dddddd;
+}
+
+.hidden {
+  max-width: 0 !important;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hiddenV {
+  max-height: 0;
+  border: none;
+  padding: 0;
+}
+
+ul.bookmarks {
+  display: table;
+  margin: 0 auto;
+}
+
+ul.bookmarks > li {
+  float: left;
+  width: 75px;
+  overflow: hidden;
+}
+
+ul.bookmarks > li:hover ul {
+  max-height: 100rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 2px solid #000000;
+}
+
+ul.bookmarks svg {
+  display: block;
+  margin: 0.5rem auto;
+  width: 2rem;
+  opacity: 0.2;
+}
+
+ul.bookmarks > li:hover svg {
+  opacity: 1;
+}
+
+ul.bookmarks a {
+  display: block;
+  font-size: 0.8rem;
+}
+
+#viewport {
+  position: relative;
+  width: 672px;
+  height: 320px;
+}
+
+#viewport * {
+  transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  max-width: 100rem;
+  box-sizing: border-box;
+}
+
+#sidebar {
+  position: absolute;
+  right: 0;
+  width: 130px;
+  height: 320px;
+  overflow: hidden;
+}
+
+#sidebar .top {
+  fill: #f8f8f8;
+}
+
+#sidebar .left {
+  fill: #f2f2f2;
+}
+
+#sidebar .right {
+  fill: #eeeeee;
+}
+
+#sidebar .path {
+  stroke: #dddddd;
+  stroke-width: 1px;
+  stroke-dasharray: 300;
+  fill-opacity: 0;
+  transition: 1s linear;
+  animation: draw 1s linear forwards,
+             color 0.5s 0.5s linear forwards;
+}
+
+#navbar {
+  position: absolute;
+  bottom: 0;
+  width: 536px;
+  height: 14px;
+}
+
+#navbar a {
+  float: left;
+  line-height: 0;
+  font-size: 0;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 300;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes color {
+  from {
+    fill-opacity: 0;
+  }
+  to {
+    fill-opacity: 1;
+  }
+}

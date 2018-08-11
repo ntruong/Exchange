@@ -21,8 +21,13 @@ description:         Please see the README on GitHub at <https://github.com/ntru
 
 dependencies:
 - base           >= 4.7 && < 5
+- bytestring     >= 0.10
 - containers     >= 0.5
+- http-types     >= 0.7
 - numeric-limits >= 0.1
+- wai            >= 3.2
+- wai-app-static >= 3.0
+- wai-extra      >= 3.0
 - warp           >= 3.2
 
 library:
