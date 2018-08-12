@@ -13,7 +13,7 @@ import Exchange.Trader
 -- defined as follows:
 --   Limit: limit orders for a given security
 --   Market: market orders for a given security
---   RegisterS: register a security (i.e. create an orderbook for it)
+--   RegisterS: register a security (i.e. create an orderbook if applicable)
 --   RegisterT: register a trader
 --   Status: get the current status of the exchange
 --   Cancel: cancel an order that matches the given metadata
@@ -28,7 +28,7 @@ data Request = Limit { order :: Order
 
              | RegisterS { ticker :: String }
 
-             | RegisterT { trader :: Trader }
+             | RegisterT { trader :: String }
 
              | Status
 
