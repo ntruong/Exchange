@@ -4,6 +4,8 @@ module Exchange.Core
   , Books
   , Traders
   , Trader(..)
+  , Msg.Request
+  , Msg.Response
   , update
   ) where
 
@@ -13,7 +15,7 @@ import qualified Exchange.Messages as Msg
 import           Exchange.Trader
 import           Data.List
 import qualified Data.Map.Strict   as M
-import           Data.Maybe        (fromMaybe)
+import           Data.Maybe               (fromMaybe)
 import           Numeric.Limits
 --------------------------------------------------------------------------------
 
@@ -22,6 +24,11 @@ import           Numeric.Limits
 type Exchange = (Books, Traders)
 type Books    = M.Map String Book
 type Traders  = M.Map String Trader
+
+
+-- | Initial (empty) state of the exchange
+empty :: Exchange
+empty = (M.empty, M.empty)
 
 
 -- | Update; handle orders and cancellations and such.
@@ -121,6 +128,20 @@ update (Msg.Market msgquant msgdir msgmd) (books, traders) = result
           books' = M.adjust (const newBook) msgticker books
           traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
 
+-- | Register a security (i.e. create an orderbook if applicable)
+update (Msg.RegisterS ticker) (books, traders) = (books', traders)
+  where
+    books' = case books M.!? ticker of
+      Nothing -> M.insert ticker (Book [] [] Nothing) books
+      Just _  -> books
+
+-- | Register a trader
+update (Msg.RegisterT trader) (books, traders) = (books, traders')
+  where
+    traders' = case traders M.!? trader of
+      Nothing -> M.insert trader (Trader 0) traders
+      Just _  -> traders
+
 -- | Get the current status of the exchange; a no-op.
 update Msg.Status exchange = exchange
 
@@ -132,6 +153,7 @@ update (Msg.Cancel msgmd) (books, traders) = (books', traders)
     removeOrder :: Book -> Book
     removeOrder (Book bids asks lastP) = Book (keep bids) (keep asks) lastP
     books' = M.adjust removeOrder (ticker msgmd) books
+
 
 -- | Reduce a book with a given order, returning a potentially unfilled order to
 -- be left on the book, filled orders, and unfilled orders.
