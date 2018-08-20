@@ -83,9 +83,7 @@ instance FromJSON EM.Request where
     case HM.lookup "type" req of
       Nothing -> typeMismatch "type" (Object req)
 
-      -- TODO(ntruong): generate order ids
-      -- {
-      --   type     : "LIMIT"
+      -- { type     : "LIMIT"
       -- , tid      : String
       -- , ticker   : String
       -- , quantity : Int
@@ -99,8 +97,7 @@ instance FromJSON EM.Request where
         <*> req .: "price"
         <*> req .: "dir"
 
-      -- {
-      --   type     : "MARKET"
+      -- { type     : "MARKET"
       -- , tid      : String
       -- , ticker   : String
       -- , quantity : Int
@@ -112,25 +109,21 @@ instance FromJSON EM.Request where
         <*> req .: "quantity"
         <*> req .: "dir"
 
-      -- {
-      --   type   : "REGISTERS"
+      -- { type   : "REGISTERS"
       -- , ticker : String
       -- }
       Just "REGISTERS" -> EM.RegisterS <$> req .: "ticker"
 
-      -- {
-      --   type   : "REGISTERT"
+      -- { type   : "REGISTERT"
       -- , trader : String
       -- }
       Just "REGISTERT" -> EM.RegisterT <$> req .: "trader"
 
-      -- {
-      --   type   : "STATUS"
+      -- { type   : "STATUS"
       -- }
       Just "STATUS" -> return EM.Status
 
-      -- {
-      --   type     : "CANCEL"
+      -- { type     : "CANCEL"
       -- , oid      : String
       -- , tid      : String
       -- , ticker   : String

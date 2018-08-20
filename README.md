@@ -20,12 +20,12 @@ following format, by request type:
 
 ### Limit
 ```
-{ "type"     : "LIMIT"
-, "quantity" : Int
-, price      : Float
-, dir        : String
-, tid        : String
-, ticker     : String
+{ type     : "LIMIT"
+, quantity : Int
+, price    : Float
+, dir      : String
+, tid      : String
+, ticker   : String
 }
 ```
 
