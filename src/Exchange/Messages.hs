@@ -44,26 +44,19 @@ data ErrorCode = Ok
 
 
 -- | Messages the exchange is expected to respond with.
-data Response a = Response ErrorCode a
+data Response = Response ErrorCode String
 
-instance (Show a) => Show (Response a) where
-  show (Response ec a) = concat [show ec, ": ", show a]
+instance Show Response where
+  show (Response ec msg) = concat [ "["
+                                  , show ec
+                                  , ": "
+                                  , msg
+                                  , "] "
+                                  ]
 
-instance Eq (Response a) where
-  (Response ec _) == (Response ec' _) = ec == ec'
+instance Semigroup Response where
+  (Response ec msg) <> (Response ec' msg') =
+    Response (max ec ec') (msg' ++ " -> " ++ msg)
 
-instance Ord (Response a) where
-  (Response ec _) <= (Response ec' _) = ec <= ec'
-
-instance Functor Response where
-  fmap f (Response ec a) = Response ec (f a)
-
-instance Applicative Response where
-  pure = Response Ok
-  (Response ec f) <*> (Response ec' a) = Response (max ec ec') (f a)
-
-instance Monad Response where
-  (Response ec a) >>= f =
-    let Response ec' b = f a
-    in  Response (max ec ec') b
-
+instance Monoid Response where
+  mempty = Response Ok "()"

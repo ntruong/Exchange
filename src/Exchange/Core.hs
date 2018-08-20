@@ -10,7 +10,7 @@ module Exchange.Core
 
 import           Exchange.Book
 import           Exchange.Order
-import qualified Exchange.Messages as Msg
+import qualified Exchange.Messages as EM
 import           Exchange.Trader
 import           Data.List
 import qualified Data.Map.Strict   as M
@@ -31,9 +31,9 @@ empty = (M.empty, M.empty)
 
 
 -- | Update; handle orders and cancellations and such.
-update :: Msg.Request -> Exchange -> Exchange
+update :: EM.Request -> Exchange -> (Exchange, EM.Response)
 
-update (Msg.Limit msgorder msgdir) (books, traders) = result
+update (EM.Limit msgorder msgdir) (books, traders) = result
   where
     msgticker = (ticker . metadata) msgorder
     msgtrader = (tid . metadata) msgorder
@@ -41,8 +41,8 @@ update (Msg.Limit msgorder msgdir) (books, traders) = result
       -- If the ticker isn't in the map, do nothing.
       -- TODO(ntruong): should return an error at some point, when responses are
       --   implemented.
-      Nothing -> (books, traders)
-      Just (Book bids asks lastP) -> (books', traders')
+      Nothing -> ((books, traders), EM.Response EM.Error ("Ticker \"" ++ msgticker ++ "\"not found"))
+      Just (Book bids asks lastP) -> ((books', traders'), EM.Response EM.Ok ("Limit trading \"" ++ msgticker ++ "\""))
         where
           -- Get the result of applying the order to the book.
           (potential, filled, unfilled) = handleOrder msgdir msgorder opps
@@ -82,14 +82,14 @@ update (Msg.Limit msgorder msgdir) (books, traders) = result
           books' = M.adjust (const newBook) msgticker books
           traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
 
-update (Msg.Market msgquant msgdir msgmd) (books, traders) = result
+update (EM.Market msgquant msgdir msgmd) (books, traders) = result
   where
     msgticker = ticker msgmd
     msgtrader = tid msgmd
     result = case books M.!? msgticker of
       -- If the ticker isn't in the map, do nothing.
-      Nothing -> (books, traders)
-      Just (Book bids asks lastP) -> (books', traders')
+      Nothing -> ((books, traders), EM.Response EM.Error ("Ticker \"" ++ msgticker ++ "\" not found"))
+      Just (Book bids asks lastP) -> ((books', traders'), EM.Response EM.Ok ("Market trading \"" ++ msgticker ++ "\""))
         where
           -- Create a "limit" order unrestrained by price
           fakeLimit = case msgdir of
@@ -129,24 +129,24 @@ update (Msg.Market msgquant msgdir msgmd) (books, traders) = result
           traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
 
 -- | Register a security (i.e. create an orderbook if applicable)
-update (Msg.RegisterS ticker) (books, traders) = (books', traders)
+update (EM.RegisterS ticker) (books, traders) = ((books', traders), resp)
   where
-    books' = case books M.!? ticker of
-      Nothing -> M.insert ticker (Book [] [] Nothing) books
-      Just _  -> books
+    (books', resp) = case books M.!? ticker of
+      Nothing -> (M.insert ticker (Book [] [] Nothing) books, EM.Response EM.Ok ("Inserting \"" ++ ticker ++ "\""))
+      Just _  -> (books, EM.Response EM.Error ("Ticker \"" ++ ticker ++ "\" already exists"))
 
 -- | Register a trader
-update (Msg.RegisterT trader) (books, traders) = (books, traders')
+update (EM.RegisterT trader) (books, traders) = ((books, traders'), resp)
   where
-    traders' = case traders M.!? trader of
-      Nothing -> M.insert trader (Trader 0) traders
-      Just _  -> traders
+    (traders', resp) = case traders M.!? trader of
+      Nothing -> (M.insert trader (Trader 0) traders, EM.Response EM.Ok ("Inserting \"" ++ trader ++ "\""))
+      Just _  -> (traders, EM.Response EM.Error ("Trader \"" ++ trader ++ "\" already exists"))
 
 -- | Get the current status of the exchange; a no-op.
-update Msg.Status exchange = exchange
+update EM.Status exchange = (exchange, EM.Response EM.Ok $ show exchange)
 
 -- | Remove the requested order from the orderbook.
-update (Msg.Cancel msgmd) (books, traders) = (books', traders)
+update (EM.Cancel msgmd) (books, traders) = ((books', traders), EM.Response EM.Ok ("Removing order matching " ++ (show msgmd)))
   where
     keep :: [Order] -> [Order]
     keep = filter ((msgmd /=) . metadata)

@@ -23,22 +23,6 @@ import           Network.Wai.Handler.Warp
 --------------------------------------------------------------------------------
 
 
--- | Handles updates to the exchange.
-exchangeApp' :: EM.Request -> IORef E.Exchange -> ResourceT IO Response
-exchangeApp' request exchange =
-  return $ responseLBS
-    status200
-    [("Content-Type", "text/html")]
-    ((pack . show) E.empty)
-  where
-    update :: IORef E.Exchange -> IO E.Exchange
-    update exch = atomicModifyIORef exch (\x -> (x, E.update request x))
-
--- need to get Request -> Response
--- we have Request -> IO [EM.Request] so we should be able to update the
--- exchange
-
-
 -- | Routes requests to the server correspondingly.
 router :: IORef E.Exchange -> Application
 router exchange request respond = do
@@ -63,17 +47,17 @@ router exchange request respond = do
       -- update (and lose granularity if/when it errors) or perform them one by
       -- one and conveniently ignore the errors for now but should be better in
       -- the future
-      requests <- decode request
+      requests  <- decode request
       responses <- mapM updateExchangeM requests
-      let resp = foldr max (EM.Response EM.Ok E.empty) responses
+      exchange' <- readIORef exchange
+      let resp = foldr (<>) mempty responses
       respond $ responseLBS
         status200
         [("Content-Type", "text/html")]
         ((pack . show) resp)
       where
-        updateExchangeM :: EM.Request -> IO (EM.Response E.Exchange)
-        updateExchangeM req = atomicModifyIORef exchange $ \e ->
-          (E.update req e, EM.Response EM.Ok E.empty)
+        updateExchangeM :: EM.Request -> IO EM.Response
+        updateExchangeM = atomicModifyIORef exchange . E.update
 
 
 -- | Let requests to the exchange be parseable. We flatten requests to make
@@ -177,9 +161,7 @@ decode request = do
   -- is just (Bytestring, Bytestring). Posts should have a field "request"
   -- pointing to a stringified JSON of the desired request.
   (params, _) <- parseRequestBody lbsBackEnd request
-  print params
   let reqs = filter (\(x, _) -> x == "request") params
-  print reqs
   return $ mapMaybe (A.decodeStrict . snd) reqs
 
 
