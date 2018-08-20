@@ -18,13 +18,17 @@ import Exchange.Trader
 --   RegisterT: register a trader
 --   Status: get the current status of the exchange
 --   Cancel: cancel an order that matches the given metadata
-data Request = Limit { order :: Order
-                     , dir   :: Direction
+data Request = Limit { trader   :: String
+                     , ticker   :: String
+                     , quantity :: Int
+                     , price    :: Float
+                     , dir      :: Direction
                      }
 
-             | Market { quantity :: Int
+             | Market { trader   :: String
+                      , ticker   :: String
+                      , quantity :: Int
                       , dir      :: Direction
-                      , metadata :: Metadata
                       }
 
              | RegisterS { ticker :: String }
@@ -34,6 +38,7 @@ data Request = Limit { order :: Order
              | Status
 
              | Cancel { metadata :: Metadata }
+
              deriving (Show)
 
 

@@ -20,34 +20,51 @@ import           Numeric.Limits
 
 
 -- | Type aliases to make life easier.
-type Exchange = (Books, Traders)
 type Books    = M.Map String Book
 type Traders  = M.Map String Trader
+
+data Exchange = Exchange
+  { books   :: Books
+  , traders :: Traders
+  , lastOid :: Int
+  } deriving (Show)
 
 
 -- | Initial (empty) state of the exchange
 empty :: Exchange
-empty = (M.empty, M.empty)
+empty = Exchange M.empty M.empty 0
 
 
 -- | Update; handle orders and cancellations and such.
 update :: EM.Request -> Exchange -> (Exchange, EM.Response)
 
-update (EM.Limit msgorder msgdir) (books, traders) = result
+update msgLimit @ (EM.Limit _ _ _ _ _) exchange = result
   where
-    msgticker = (ticker . metadata) msgorder
-    msgtrader = (tid . metadata) msgorder
-    result = case books M.!? msgticker of
+    -- Get the exchange's parameters.
+    msgBooks    = books exchange
+    msgTraders  = traders exchange
+    msgOid      = lastOid exchange
+    -- Get the message's parameters.
+    msgTrader   = EM.trader   msgLimit
+    msgTicker   = EM.ticker   msgLimit
+    msgQuantity = EM.quantity msgLimit
+    msgPrice    = EM.price    msgLimit
+    msgDir      = EM.dir      msgLimit
+    msgMd       = Metadata msgOid msgTrader msgTicker
+    msgOrder    = Order msgQuantity msgPrice msgMd
+    -- Handle the order.
+    result = case msgBooks M.!? msgTicker of
       -- If the ticker isn't in the map, do nothing.
-      -- TODO(ntruong): should return an error at some point, when responses are
-      --   implemented.
-      Nothing -> ((books, traders), EM.Response EM.Error ("Ticker \"" ++ msgticker ++ "\"not found"))
-      Just (Book bids asks lastP) -> ((books', traders'), EM.Response EM.Ok ("Limit trading \"" ++ msgticker ++ "\""))
+      Nothing ->
+        ( exchange
+        , EM.Response EM.Error ("Ticker \"" ++ msgTicker ++ "\"not found")
+        )
+      Just (Book bids asks lastP) -> (exchange', EM.Response EM.Ok $ show msgMd)
         where
           -- Get the result of applying the order to the book.
-          (potential, filled, unfilled) = handleOrder msgdir msgorder opps
+          (potential, filled, unfilled) = handleOrder msgDir msgOrder opps
             where
-              opps = case msgdir of
+              opps = case msgDir of
                 Bid -> asks
                 Ask -> bids
 
@@ -57,7 +74,7 @@ update (EM.Limit msgorder msgdir) (books, traders) = result
             x:_ -> Just $ price x
 
           -- Generate the new book after the trade is completed.
-          newBook = case msgdir of
+          newBook = case msgDir of
             Bid -> case potential of
               Just x  -> Book (x:bids) unfilled lastP'
               Nothing -> Book bids unfilled lastP'
@@ -70,34 +87,47 @@ update (EM.Limit msgorder msgdir) (books, traders) = result
             where
               createUpdate (Order tq tp tmd) = ts
                 where
-                  cash = case msgdir of
+                  cash = case msgDir of
                     Bid -> -1 * tp * fromIntegral tq
                     Ask ->  1 * tp * fromIntegral tq
                   ts =
-                    [ (msgtrader, \t -> t { funds = funds t + cash })
+                    [ (msgTrader, \t -> t { funds = funds t + cash })
                     , (tid tmd, \t -> t { funds = funds t - cash })
                     ]
 
           -- Update the values in the map.
-          books' = M.adjust (const newBook) msgticker books
-          traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
+          books'    = M.adjust (const newBook) msgTicker msgBooks
+          traders'  = foldr (\(k, v) ts' -> M.adjust v k ts') msgTraders traderUpdates
+          exchange' = Exchange books' traders' (msgOid + 1)
 
-update (EM.Market msgquant msgdir msgmd) (books, traders) = result
+update msgMarket @ (EM.Market _ _ _ _) exchange = result
   where
-    msgticker = ticker msgmd
-    msgtrader = tid msgmd
-    result = case books M.!? msgticker of
+    -- Get the exchange's parameters.
+    msgBooks    = books exchange
+    msgTraders  = traders exchange
+    msgOid      = lastOid exchange
+    -- Get the message's parameters.
+    msgTrader   = EM.trader   msgMarket
+    msgTicker   = EM.ticker   msgMarket
+    msgQuantity = EM.quantity msgMarket
+    msgDir      = EM.dir      msgMarket
+    msgMd       = Metadata msgOid msgTrader msgTicker
+    -- Handle the order.
+    result = case msgBooks M.!? msgTicker of
       -- If the ticker isn't in the map, do nothing.
-      Nothing -> ((books, traders), EM.Response EM.Error ("Ticker \"" ++ msgticker ++ "\" not found"))
-      Just (Book bids asks lastP) -> ((books', traders'), EM.Response EM.Ok ("Market trading \"" ++ msgticker ++ "\""))
+      Nothing ->
+        ( exchange
+        , EM.Response EM.Error ("Ticker \"" ++ msgTicker ++ "\" not found")
+        )
+      Just (Book bids asks lastP) -> (exchange', EM.Response EM.Ok $ show msgMd)
         where
           -- Create a "limit" order unrestrained by price
-          fakeLimit = case msgdir of
-            Bid -> Order msgquant maxValue msgmd
-            Ask -> Order msgquant minValue msgmd
-          (potential, filled, unfilled) = handleOrder msgdir fakeLimit opps
+          fakeLimit = case msgDir of
+            Bid -> Order msgQuantity maxValue msgMd
+            Ask -> Order msgQuantity minValue msgMd
+          (potential, filled, unfilled) = handleOrder msgDir fakeLimit opps
             where
-              opps = case msgdir of
+              opps = case msgDir of
                 Bid -> asks
                 Ask -> bids
 
@@ -107,7 +137,7 @@ update (EM.Market msgquant msgdir msgmd) (books, traders) = result
             x:_ -> Just $ price x
 
           -- Generate the new book after the trade is completed.
-          newBook = case msgdir of
+          newBook = case msgDir of
             Bid -> Book bids unfilled lastP'
             Ask -> Book unfilled asks lastP'
 
@@ -116,43 +146,64 @@ update (EM.Market msgquant msgdir msgmd) (books, traders) = result
             where
               createUpdate (Order tq tp tmd) = ts
                 where
-                  cash = case msgdir of
+                  cash = case msgDir of
                     Bid -> -1 * tp * fromIntegral tq
                     Ask ->  1 * tp * fromIntegral tq
                   ts =
-                    [ (msgtrader, \t -> t { funds = funds t + cash })
+                    [ (msgTrader, \t -> t { funds = funds t + cash })
                     , (tid tmd, \t -> t { funds = funds t - cash })
                     ]
 
           -- Update the values in the map.
-          books' = M.adjust (const newBook) msgticker books
-          traders' = foldr (\(k, v) ts' -> M.adjust v k ts') traders traderUpdates
+          books'    = M.adjust (const newBook) msgTicker msgBooks
+          traders'  = foldr (\(k, v) ts' -> M.adjust v k ts') msgTraders traderUpdates
+          exchange' = Exchange books' traders' (msgOid + 1)
 
 -- | Register a security (i.e. create an orderbook if applicable)
-update (EM.RegisterS ticker) (books, traders) = ((books', traders), resp)
+update (EM.RegisterS ticker) exchange = (exchange', resp)
   where
-    (books', resp) = case books M.!? ticker of
-      Nothing -> (M.insert ticker (Book [] [] Nothing) books, EM.Response EM.Ok ("Inserting \"" ++ ticker ++ "\""))
-      Just _  -> (books, EM.Response EM.Error ("Ticker \"" ++ ticker ++ "\" already exists"))
+    msgBooks = books exchange
+    (books', resp) = case msgBooks M.!? ticker of
+      Nothing ->
+        ( M.insert ticker (Book [] [] Nothing) msgBooks
+        , EM.Response EM.Ok ("Inserting \"" ++ ticker ++ "\"")
+        )
+      Just _  ->
+        ( msgBooks
+        , EM.Response EM.Error ("Ticker \"" ++ ticker ++ "\" already exists")
+        )
+    exchange' = exchange { books = books'}
 
 -- | Register a trader
-update (EM.RegisterT trader) (books, traders) = ((books, traders'), resp)
+update (EM.RegisterT trader) exchange = (exchange', resp)
   where
-    (traders', resp) = case traders M.!? trader of
-      Nothing -> (M.insert trader (Trader 0) traders, EM.Response EM.Ok ("Inserting \"" ++ trader ++ "\""))
-      Just _  -> (traders, EM.Response EM.Error ("Trader \"" ++ trader ++ "\" already exists"))
+    msgTraders = traders exchange
+    (traders', resp) = case msgTraders M.!? trader of
+      Nothing ->
+        ( M.insert trader (Trader 0) msgTraders
+        , EM.Response EM.Ok ("Inserting \"" ++ trader ++ "\"")
+        )
+      Just _  ->
+        ( msgTraders
+        , EM.Response EM.Error ("Trader \"" ++ trader ++ "\" already exists")
+        )
+    exchange' = exchange { traders = traders' }
 
 -- | Get the current status of the exchange; a no-op.
 update EM.Status exchange = (exchange, EM.Response EM.Ok $ show exchange)
 
 -- | Remove the requested order from the orderbook.
-update (EM.Cancel msgmd) (books, traders) = ((books', traders), EM.Response EM.Ok ("Removing order matching " ++ (show msgmd)))
+update (EM.Cancel msgMd) exchange =
+  ( exchange'
+  , EM.Response EM.Ok ("Removing order matching " ++ (show msgMd))
+  )
   where
     keep :: [Order] -> [Order]
-    keep = filter ((msgmd /=) . metadata)
+    keep = filter ((msgMd /=) . metadata)
     removeOrder :: Book -> Book
     removeOrder (Book bids asks lastP) = Book (keep bids) (keep asks) lastP
-    books' = M.adjust removeOrder (ticker msgmd) books
+    books' = M.adjust removeOrder (ticker msgMd) (books exchange)
+    exchange' = exchange { books = books' }
 
 
 -- | Reduce a book with a given order, returning a potentially unfilled order to

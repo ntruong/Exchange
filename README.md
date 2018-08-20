@@ -15,7 +15,7 @@ As of now, orders are evaluated with partial filling; "all-or-none" or
 
 ## Communicating with the exchange
 By default, the exchange runs on `localhost:8080`. The exchange handles requests
-via HTTP POSTs adhering to `request={type=[type], ...}` where the request adheres to the
+via HTTP POSTs adhering to `request=...` where the request adheres to the
 following format, by request type:
 
 ### Limit
@@ -24,7 +24,6 @@ following format, by request type:
 , "quantity" : Int
 , price      : Float
 , dir        : String
-, oid        : String
 , tid        : String
 , ticker     : String
 }
@@ -35,7 +34,6 @@ following format, by request type:
 { type     : "MARKET"
 , quantity : Int
 , dir      : String
-, oid      : String
 , tid      : String
 , ticker   : String
 }

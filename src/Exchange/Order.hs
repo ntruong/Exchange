@@ -16,14 +16,14 @@ data Direction = Bid
 -- tid    (trader ID)
 -- ticker (security ID)
 data Metadata = Metadata
-  { oid    :: String
+  { oid    :: Int
   , tid    :: String
   , ticker :: String
   } deriving (Eq)
 
 -- | Should appear as "[orderid/traderid]ticker".
 instance Show Metadata where
-  show (Metadata o t tick) = concat ["[", o, "/", t, "]", tick]
+  show (Metadata o t tick) = concat ["[", show o, "/", t, "]", tick]
 
 -- | Every order ships with:
 -- quantity   (amount of security to transact)

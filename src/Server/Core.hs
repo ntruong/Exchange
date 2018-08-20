@@ -77,51 +77,40 @@ instance FromJSON EO.Direction where
     "ASK" -> return EO.Ask
     _     -> typeMismatch "Exchange.Messages.Direction" (String dir)
 
--- TODO(ntruong): what happens if JSON parsing fails? does the exchange crash?
 -- Parse requests.
 instance FromJSON EM.Request where
   parseJSON = withObject "Exchange.Messages.Request" $ \req ->
     case HM.lookup "type" req of
       Nothing -> typeMismatch "type" (Object req)
 
+      -- TODO(ntruong): generate order ids
       -- {
       --   type     : "LIMIT"
+      -- , tid      : String
+      -- , ticker   : String
       -- , quantity : Int
       -- , price    : Float
       -- , dir      : String
-      -- , oid      : String
-      -- , tid      : String
-      -- , ticker   : String
       -- }
-      Just "LIMIT" ->
-        let msgMd = EO.Metadata
-              <$> req .: "oid"
-              <*> req .: "tid"
-              <*> req .: "ticker"
-            msgOrd = EO.Order
-              <$> req .: "quantity"
-              <*> req .: "price"
-              <*> msgMd
-        in  EM.Limit
-              <$> msgOrd
-              <*> req .: "dir"
+      Just "LIMIT" -> EM.Limit
+        <$> req .: "tid"
+        <*> req .: "ticker"
+        <*> req .: "quantity"
+        <*> req .: "price"
+        <*> req .: "dir"
+
       -- {
       --   type     : "MARKET"
-      -- , quantity : Int
-      -- , dir      : String
-      -- , oid      : String
       -- , tid      : String
       -- , ticker   : String
+      -- , quantity : Int
+      -- , dir      : String
       -- }
-      Just "MARKET" ->
-        let msgMd = EO.Metadata
-              <$> req .: "oid"
-              <*> req .: "tid"
-              <*> req .: "ticker"
-        in  EM.Market
-              <$> req .: "quantity"
-              <*> req .: "dir"
-              <*> msgMd
+      Just "MARKET" -> EM.Market
+        <$> req .: "tid"
+        <*> req .: "ticker"
+        <*> req .: "quantity"
+        <*> req .: "dir"
 
       -- {
       --   type   : "REGISTERS"
