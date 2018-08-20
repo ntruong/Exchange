@@ -29,7 +29,9 @@ following format, by request type:
 , ticker     : String
 }
 ```
+
 ### Market
+```
 { type     : "MARKET"
 , quantity : Int
 , dir      : String
@@ -37,23 +39,32 @@ following format, by request type:
 , tid      : String
 , ticker   : String
 }
+```
 
 ### Security registration
+```
 { type   : "REGISTERS"
 , ticker : String
 }
+```
 
 ### Trader registration
+```
 { type   : "REGISTERT"
 , trader : String
 }
+```
 
 ### Status
+```
 { type : "STATUS" }
+```
 
 ### Order cancellation
+```
 { type     : "CANCEL"
 , oid      : String
 , tid      : String
 , ticker   : String
 }
+```
