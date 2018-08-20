@@ -4,8 +4,7 @@ module Exchange.Core
   , Books
   , Traders
   , Trader(..)
-  , Msg.Request
-  , Msg.Response
+  , empty
   , update
   ) where
 
@@ -40,7 +39,8 @@ update (Msg.Limit msgorder msgdir) (books, traders) = result
     msgtrader = (tid . metadata) msgorder
     result = case books M.!? msgticker of
       -- If the ticker isn't in the map, do nothing.
-      -- TODO: should return an error at some point, when responses are implemented.
+      -- TODO(ntruong): should return an error at some point, when responses are
+      --   implemented.
       Nothing -> (books, traders)
       Just (Book bids asks lastP) -> (books', traders')
         where

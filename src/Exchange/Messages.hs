@@ -9,6 +9,7 @@ import Exchange.Order  (Direction, Metadata, Order)
 import Exchange.Trader
 --------------------------------------------------------------------------------
 
+
 -- | Messages the exchange is expected to receive and handle. The messages are
 -- defined as follows:
 --   Limit: limit orders for a given security
@@ -33,10 +34,26 @@ data Request = Limit { order :: Order
              | Status
 
              | Cancel { metadata :: Metadata }
+             deriving (Show)
+
+
+-- | Error codes for responses.
+data ErrorCode = Ok
+               | Error
+               deriving (Eq, Ord, Show)
 
 
 -- | Messages the exchange is expected to respond with.
 data Response a = Response ErrorCode a
+
+instance (Show a) => Show (Response a) where
+  show (Response ec a) = concat [show ec, ": ", show a]
+
+instance Eq (Response a) where
+  (Response ec _) == (Response ec' _) = ec == ec'
+
+instance Ord (Response a) where
+  (Response ec _) <= (Response ec' _) = ec <= ec'
 
 instance Functor Response where
   fmap f (Response ec a) = Response ec (f a)
@@ -50,8 +67,3 @@ instance Monad Response where
     let Response ec' b = f a
     in  Response (max ec ec') b
 
-
--- | Error codes for responses.
-data ErrorCode = Ok
-               | Error
-               deriving (Eq, Ord)
