@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 module Exchange.Core
-  ( Exchange
+  ( Exchange(..)
   , Books
   , Traders
   , Trader(..)

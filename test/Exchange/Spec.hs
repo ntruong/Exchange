@@ -13,32 +13,34 @@ import           Data.Maybe        (fromMaybe, isNothing)
 --------------------------------------------------------------------------------
 
 -- | Test setup
-testbids :: [Order]
-testbids = [ Order 100 85 (Metadata "order1" "trader1" "TICKER")
-        , Order 100 90 (Metadata "order2" "trader2" "TICKER")
-        , Order 100 95 (Metadata "order3" "trader3" "TICKER")
-        ]
+testBids :: [Order]
+testBids =
+  [ Order 100 85 (Metadata 1 "trader1" "TICKER")
+  , Order 100 90 (Metadata 2 "trader2" "TICKER")
+  , Order 100 95 (Metadata 3 "trader3" "TICKER")
+  ]
 
-testasks :: [Order]
-testasks = [ Order 100 105 (Metadata "order4" "trader4" "TICKER")
-        , Order 100 110 (Metadata "order5" "trader5" "TICKER")
-        , Order 100 115 (Metadata "order6" "trader6" "TICKER")
-        ]
+testAsks :: [Order]
+testAsks =
+  [ Order 100 105 (Metadata 4 "trader4" "TICKER")
+  , Order 100 110 (Metadata 5 "trader5" "TICKER")
+  , Order 100 115 (Metadata 6 "trader6" "TICKER")
+  ]
 
-books   = M.fromList [("TICKER", Book testbids testasks Nothing)]
-traders = M.fromList [ ("trader1", Trader 100.0)
-                   , ("trader2", Trader 100.0)
-                   , ("trader3", Trader 100.0)
-                   , ("trader4", Trader 100.0)
-                   , ("trader5", Trader 100.0)
-                   , ("trader6", Trader 100.0)
-                   ]
+testBooks   = M.fromList [("TICKER", Book testBids testAsks Nothing)]
+testTraders = M.fromList [ ("trader1", Trader 100.0)
+                         , ("trader2", Trader 100.0)
+                         , ("trader3", Trader 100.0)
+                         , ("trader4", Trader 100.0)
+                         , ("trader5", Trader 100.0)
+                         , ("trader6", Trader 100.0)
+                         ]
 
-testmd :: Metadata
-testmd = Metadata "order7" "trader1" "TICKER"
+testMd :: Metadata
+testMd = Metadata 7 "trader1" "TICKER"
 
 exchange :: Exchange
-exchange = (books, traders)
+exchange = Exchange testBooks testTraders 7
 
 orderIsIn :: Metadata -> Book -> Bool
 orderIsIn md (Book bids asks _) = result
@@ -51,18 +53,18 @@ orderIsIn md (Book bids asks _) = result
 cancelSpec :: Bool
 cancelSpec = result
   where
-    testmd' :: Metadata
-    testmd' = Metadata "order1" "trader1" "TICKER"
+    testMd' :: Metadata
+    testMd' = Metadata 1 "trader1" "TICKER"
     msg :: Msg.Request
-    msg = Msg.Cancel testmd'
-    testbooks :: M.Map String Book
-    (testbooks, _) = update msg exchange
-    orderbook = testbooks M.! "TICKER"
+    msg = Msg.Cancel testMd'
+    testBooks :: M.Map String Book
+    (Exchange testBooks _ _, _) = update msg exchange
+    orderbook = testBooks M.! "TICKER"
     Book bids asks _ = orderbook
     conditions =
       [ length bids == 2
       , length asks == 3
-      , not $ orderIsIn testmd' orderbook
+      , not $ orderIsIn testMd' orderbook
       ]
     result = and conditions
 
@@ -71,16 +73,16 @@ fillOrderSpec :: Bool
 fillOrderSpec = result
   where
     msg :: Msg.Request
-    msg = Msg.Market 100 Bid testmd
-    testbooks :: M.Map String Book
-    (testbooks, _) = update msg exchange
-    orderbook = testbooks M.! "TICKER"
+    msg = Msg.Market "trader1" "TICKER" 100 Bid
+    testBooks :: M.Map String Book
+    (Exchange testBooks _ _, _) = update msg exchange
+    orderbook = testBooks M.! "TICKER"
     Book bids asks lp = orderbook
     conditions =
       [ length bids == 3
       , length asks == 2
       , lp == Just 105
-      , not $ orderIsIn testmd orderbook
+      , not $ orderIsIn testMd orderbook
       ]
     result = and conditions
 
@@ -88,19 +90,17 @@ fillOrderSpec = result
 unfillLimitOrderSpec :: Bool
 unfillLimitOrderSpec = result
   where
-    order :: Order
-    order = Order 100 99 testmd
     msg :: Msg.Request
-    msg = Msg.Limit order Bid
-    testbooks :: M.Map String Book
-    (testbooks, _) = update msg exchange
-    orderbook = testbooks M.! "TICKER"
-    Book testbids testasks lp = orderbook
+    msg = Msg.Limit "trader1" "TICKER" 100 99 Bid
+    testBooks :: M.Map String Book
+    (Exchange testBooks _ _, _) = update msg exchange
+    orderbook = testBooks M.! "TICKER"
+    Book testBids testAsks lp = orderbook
     conditions =
-      [ length testbids == 4
-      , length testasks == 3
+      [ length testBids == 4
+      , length testAsks == 3
       , isNothing lp
-      , orderIsIn testmd orderbook
+      , orderIsIn testMd orderbook
       ]
     result = and conditions
 
@@ -108,19 +108,18 @@ unfillLimitOrderSpec = result
 fillLimitOrderSpec :: Bool
 fillLimitOrderSpec = result
   where
-    order :: Order
-    order = Order 100 120 testmd
     msg :: Msg.Request
-    msg = Msg.Limit order Bid
-    testbooks :: M.Map String Book
-    (testbooks, testtraders) = update msg exchange
-    orderbook = testbooks M.! "TICKER"
-    trader = testtraders M.! "trader1"
-    Book testbids testasks _ = orderbook
+    msg = Msg.Limit "trader1" "TICKER" 100 120 Bid
+    testBooks :: M.Map String Book
+    testTraders :: M.Map String Trader
+    (Exchange testBooks testTraders _, _) = update msg exchange
+    orderbook = testBooks M.! "TICKER"
+    trader = testTraders M.! "trader1"
+    Book testBids testAsks _ = orderbook
     conditions =
-      [ length testbids == 3
-      , length testasks == 2
-      , not $ orderIsIn testmd orderbook
+      [ length testBids == 3
+      , length testAsks == 2
+      , not $ orderIsIn testMd orderbook
       , funds trader == -10400
       ]
     result = and conditions
