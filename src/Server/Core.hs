@@ -50,7 +50,9 @@ router exchange request respond = do
       requests  <- decode request
       responses <- mapM updateExchangeM requests
       exchange' <- readIORef exchange
-      let resp = foldr (<>) mempty responses
+      let resp = case responses of
+            [] -> EM.Response EM.Error "Could not parse requests."
+            _  -> foldr (<>) mempty responses
       respond $ responseLBS
         status200
         [("Content-Type", "text/html")]
