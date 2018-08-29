@@ -8,6 +8,7 @@ module Server.Core
 import qualified Exchange.Core as E
 import qualified Exchange.Messages as EM
 import qualified Exchange.Order as EO
+import           Server.Messages
 import           Control.Monad.Trans.Resource   (ResourceT)
 import qualified Data.Aeson as A
 import           Data.Aeson.Types
@@ -63,88 +64,12 @@ router exchange request respond = do
         updateExchangeM = atomicModifyIORef exchange . E.update
 
 
--- | Let requests to the exchange be parseable. We flatten requests to make
--- parsing JSONs easier.
-
--- Parse order metadata.
-instance FromJSON EO.Metadata where
-  parseJSON = withObject "Exchange.Messages.Metadata" $ \md -> EO.Metadata
-    <$> md .: "oid"
-    <*> md .: "tid"
-    <*> md .: "ticker"
-
--- Parse order direction.
-instance FromJSON EO.Direction where
-  parseJSON = withText "Exchange.Messages.Direction" $ \dir -> case dir of
-    "BID" -> return EO.Bid
-    "ASK" -> return EO.Ask
-    _     -> typeMismatch "Exchange.Messages.Direction" (String dir)
-
--- Parse requests.
-instance FromJSON EM.Request where
-  parseJSON = withObject "Exchange.Messages.Request" $ \req ->
-    case HM.lookup "type" req of
-      Nothing -> typeMismatch "type" (Object req)
-
-      -- { type     : "LIMIT"
-      -- , tid      : String
-      -- , ticker   : String
-      -- , quantity : Int
-      -- , price    : Float
-      -- , dir      : String
-      -- }
-      Just "LIMIT" -> EM.Limit
-        <$> req .: "tid"
-        <*> req .: "ticker"
-        <*> req .: "quantity"
-        <*> req .: "price"
-        <*> req .: "dir"
-
-      -- { type     : "MARKET"
-      -- , tid      : String
-      -- , ticker   : String
-      -- , quantity : Int
-      -- , dir      : String
-      -- }
-      Just "MARKET" -> EM.Market
-        <$> req .: "tid"
-        <*> req .: "ticker"
-        <*> req .: "quantity"
-        <*> req .: "dir"
-
-      -- { type   : "REGISTERS"
-      -- , ticker : String
-      -- }
-      Just "REGISTERS" -> EM.RegisterS <$> req .: "ticker"
-
-      -- { type   : "REGISTERT"
-      -- , trader : String
-      -- }
-      Just "REGISTERT" -> EM.RegisterT <$> req .: "trader"
-
-      -- { type   : "STATUS"
-      -- }
-      Just "STATUS" -> return EM.Status
-
-      -- { type     : "CANCEL"
-      -- , oid      : String
-      -- , tid      : String
-      -- , ticker   : String
-      -- }
-      Just "CANCEL" ->
-        let msgMd = EO.Metadata
-              <$> req .: "oid"
-              <*> req .: "tid"
-              <*> req .: "ticker"
-        in  EM.Cancel <$> msgMd
-
-
 -- | Decode a request.
 decode :: Request -> IO [EM.Request]
 decode request = do
   -- Parse the request. `parseRequestBody` returns ([Param], [File _]) and Param
-  -- is just (Bytestring, Bytestring). Posts should have a field "request"
-  -- pointing to a stringified JSON of the desired request.
+  -- is just (Bytestring, Bytestring). Posts should contain simply a stringified
+  -- JSON of the desired request.
   (params, _) <- parseRequestBody lbsBackEnd request
   let reqs = fst <$> params
   return $ mapMaybe A.decodeStrict reqs
