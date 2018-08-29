@@ -146,8 +146,6 @@ decode request = do
   -- is just (Bytestring, Bytestring). Posts should have a field "request"
   -- pointing to a stringified JSON of the desired request.
   (params, _) <- parseRequestBody lbsBackEnd request
-  -- let reqs = filter (\(x, _) -> x == "request") params
-  -- return $ mapMaybe (A.decodeStrict . snd) reqs
   let reqs = fst <$> params
   return $ mapMaybe A.decodeStrict reqs
 
