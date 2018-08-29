@@ -19,7 +19,7 @@ via HTTP POSTs adhering to the following format, by request type:
 
 ### Limit
 ```
-{ type     : "LIMIT"
+{ type     : "limit"
 , quantity : Int
 , price    : Float
 , dir      : String
@@ -30,7 +30,7 @@ via HTTP POSTs adhering to the following format, by request type:
 
 ### Market
 ```
-{ type     : "MARKET"
+{ type     : "market"
 , quantity : Int
 , dir      : String
 , tid      : String
@@ -40,21 +40,21 @@ via HTTP POSTs adhering to the following format, by request type:
 
 ### Security registration
 ```
-{ type   : "REGISTERS"
+{ type   : "registers"
 , ticker : String
 }
 ```
 
 ### Trader registration
 ```
-{ type   : "REGISTERT"
+{ type   : "registert"
 , trader : String
 }
 ```
 
 ### Status
 ```
-{ type : "STATUS" }
+{ type : "status" }
 ```
 
 ### Order cancellation
